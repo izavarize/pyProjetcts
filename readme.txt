@@ -1,1 +1,1 @@
-testando git e vscode
+Projetos Python - pesquisa e testes de automação.
