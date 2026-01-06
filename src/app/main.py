@@ -2,17 +2,16 @@ from app.application.ai_service import AIService
 
 
 def main() -> None:
-    ai_service = AIService()
+    ai = AIService()
 
-    code_example = """
+    result = ai.explain_code(
+        """
 def soma(a, b):
     return a + b
 """
+    )
 
-    explanation = ai_service.explain_code(code_example)
-
-    print("Resposta do Gemini:")
-    print(explanation)
+    print(result.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":
