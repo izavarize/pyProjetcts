@@ -1,4 +1,5 @@
 from app.domain.rag import DocumentChunk
+from app.infrastructure.rag.chunker import TextChunker
 from app.infrastructure.rag.embedder import GeminiEmbedder
 from app.infrastructure.rag.vector_store import InMemoryVectorStore
 
@@ -7,10 +8,23 @@ class RAGService:
     def __init__(self) -> None:
         self._embedder = GeminiEmbedder()
         self._store = InMemoryVectorStore()
+        self._chunker = TextChunker(chunk_size=500, overlap=100)
 
     def ingest(self, documents: list[DocumentChunk]) -> None:
-        embeddings = self._embedder.embed([d.content for d in documents])
-        self._store.add(embeddings, documents)
+        chunks: list[DocumentChunk] = []
+
+        for doc in documents:
+            parts = self._chunker.chunk(doc.content)
+            for i, part in enumerate(parts):
+                chunks.append(
+                    DocumentChunk(
+                        content=part,
+                        source=f"{doc.source}#chunk{i}",
+                    )
+                )
+
+        embeddings = self._embedder.embed([c.content for c in chunks])
+        self._store.add(embeddings, chunks)
 
     def retrieve(self, query: str, top_k: int = 3) -> list[DocumentChunk]:
         query_embedding = self._embedder.embed([query])[0]
