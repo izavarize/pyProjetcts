@@ -17,7 +17,7 @@ def main() -> None:
         ]
     )
 
-    result = ai.answer_with_rag("Como funciona a função soma?")
+    result = ai.answer_with_rag("o que diz o art. 3º da constituição brasileira?")
 
     print("Resposta:")
     print(result.answer)

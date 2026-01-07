@@ -3,10 +3,6 @@ import re
 
 class KeywordScorer:
     def score(self, query: str, text: str) -> float:
-        """
-        Score simples baseado em ocorrência de termos.
-        Retorna valor entre 0.0 e 1.0
-        """
         query_terms = self._normalize(query)
         text_terms = self._normalize(text)
 

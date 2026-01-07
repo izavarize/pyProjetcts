@@ -17,19 +17,13 @@ class AIService:
         self._rag = RAGService()
 
     def ingest_documents(self, docs: list[tuple[str, str]]) -> None:
-        """
-        Recebe documentos brutos e delega a ingestão ao RAG.
-        """
         chunks = [
-            DocumentChunk(content=content, source=source) for content, source in docs
+            DocumentChunk(content=content, source=source)
+            for content, source in docs
         ]
         self._rag.ingest(chunks)
 
     def answer_with_rag(self, question: str) -> RAGAnswer:
-        """
-        Primeiro tenta responder via RAG.
-        Se não houver contexto relevante, faz fallback para LLM puro.
-        """
         retrieved = self._rag.retrieve(question)
 
         if not retrieved:
@@ -39,7 +33,9 @@ class AIService:
         sources = []
 
         for chunk in retrieved:
-            context_blocks.append(f"[Fonte: {chunk.source}]\n{chunk.content}")
+            context_blocks.append(
+                f"[Fonte: {chunk.source}]\n{chunk.content}"
+            )
             sources.append(chunk.source)
 
         context = "\n\n".join(context_blocks)
@@ -53,15 +49,8 @@ Contexto:
 Pergunta:
 {question}
 
-Instruções obrigatórias:
-- Não invente informações.
-- Se a resposta não estiver no contexto, diga que não foi encontrada.
-- Retorne a resposta no seguinte JSON:
-
-{{
-  "answer": string,
-  "sources": string[]
-}}
+Retorne a resposta no seguinte JSON:
+{{"answer": string, "sources": string[]}}
 """
 
         raw = self._llm.generate(prompt)
@@ -71,29 +60,21 @@ Instruções obrigatórias:
         return RAGAnswer.model_validate(data)
 
     def _fallback_answer(self, question: str) -> RAGAnswer:
-        """
-        Fallback para LLM puro quando o RAG não encontra contexto.
-        """
         today = date.today().strftime("%d/%m/%Y")
 
         prompt = f"""
-Você é um assistente jurídico e informacional.
+Você é um assistente jurídico.
 
-A pergunta abaixo NÃO possui base nos documentos fornecidos.
-Responda com base em conhecimento geral, deixando claro que
-a resposta NÃO está fundamentada em documentos específicos.
+A pergunta abaixo não possui base documental.
+Responda com conhecimento geral e ressalva explícita.
 
 Data atual: {today}
 
 Pergunta:
 {question}
 
-Retorne a resposta no seguinte JSON:
-
-{{
-  "answer": string,
-  "sources": []
-}}
+Retorne JSON:
+{{"answer": string, "sources": []}}
 """
 
         raw = self._llm.generate(prompt)
@@ -113,7 +94,7 @@ Retorne a resposta no seguinte JSON:
         start = text.find("{")
         end = text.rfind("}")
 
-        if start == -1 or end == -1 or end <= start:
-            raise RuntimeError(f"JSON não encontrado na resposta:\n{text}")
+        if start == -1 or end == -1:
+            raise RuntimeError("JSON não encontrado")
 
         return text[start : end + 1]
