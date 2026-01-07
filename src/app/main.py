@@ -7,12 +7,10 @@ def main() -> None:
     ai.ingest_documents(
         [
             (
-                "A função soma recebe dois parâmetros e retorna a soma.",
+                "A função soma recebe dois parâmetros e retorna a soma. "
+                "Ela é usada para operações matemáticas simples em Python. "
+                "Funções em Python são definidas com a palavra-chave def.",
                 "manual-python.txt",
-            ),
-            (
-                "Em Python, funções são definidas com a palavra-chave def.",
-                "doc-python.txt",
             ),
         ]
     )
