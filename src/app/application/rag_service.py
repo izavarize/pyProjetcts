@@ -10,11 +10,10 @@ class RAGService:
         self._store = SQLiteVectorStore("rag.db")
         self._chunker = TokenChunker(chunk_tokens=200, overlap_tokens=40)
 
+        # Baseline seguro
+        self._min_score = 0.75
+
     def ingest(self, documents: list[DocumentChunk]) -> None:
-        """
-        Recebe documentos, aplica chunking por tokens,
-        gera embeddings e persiste no vector store.
-        """
         chunks: list[DocumentChunk] = []
 
         for doc in documents:
@@ -35,11 +34,13 @@ class RAGService:
         self._store.add(embeddings, chunks)
 
     def retrieve(self, query: str, top_k: int = 3) -> list[DocumentChunk]:
-        """
-        Busca os chunks mais relevantes para a query.
-        """
         query_embedding = self._embedder.embed([query])[0]
-        results = self._store.search(query_embedding, top_k=top_k)
+
+        results = self._store.search(
+            query_vector=query_embedding,
+            top_k=top_k,
+            min_score=self._min_score,
+        )
 
         return [
             DocumentChunk(

@@ -8,7 +8,7 @@ from app.domain.rag import DocumentChunk, RetrievedChunk
 
 
 class SQLiteVectorStore:
-    def __init__(self, db_path: str = "rag_vectors.db") -> None:
+    def __init__(self, db_path: str = "rag.db") -> None:
         self._path = Path(db_path)
         self._conn = sqlite3.connect(self._path)
         self._init_db()
@@ -45,25 +45,36 @@ class SQLiteVectorStore:
 
         self._conn.commit()
 
-    def search(self, query_vector: list[float], top_k: int = 3) -> list[RetrievedChunk]:
+    def search(
+        self,
+        query_vector: list[float],
+        top_k: int = 3,
+        min_score: float = 0.75,
+    ) -> list[RetrievedChunk]:
+        """
+        Retorna apenas chunks com score >= min_score.
+        """
         cur = self._conn.cursor()
         cur.execute("SELECT source, content, embedding FROM vectors")
 
         rows = cur.fetchall()
         q = np.array(query_vector)
 
-        scored = []
+        results: list[RetrievedChunk] = []
 
         for source, content, emb_json in rows:
             v = np.array(json.loads(emb_json))
+
             score = float(np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v)))
 
-            scored.append(
-                RetrievedChunk(
-                    content=content,
-                    source=source,
-                    score=score,
+            if score >= min_score:
+                results.append(
+                    RetrievedChunk(
+                        content=content,
+                        source=source,
+                        score=score,
+                    )
                 )
-            )
 
-        return sorted(scored, key=lambda x: x.score, reverse=True)[:top_k]
+        results.sort(key=lambda x: x.score, reverse=True)
+        return results[:top_k]
