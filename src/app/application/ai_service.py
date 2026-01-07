@@ -1,9 +1,9 @@
-
 import json
-
 from app.core.config import settings
 from app.domain.ai_responses import CodeExplanation
 from app.infrastructure.ai.gemini_client import GeminiClient
+from app.application.rag_service import RAGService
+from app.domain.rag import DocumentChunk
 
 
 class AIService:
@@ -60,8 +60,36 @@ Código:
         end = text.rfind("}")
 
         if start == -1 or end == -1 or end <= start:
-            raise RuntimeError(
-                f"Não foi possível extrair JSON da resposta:\n{text}"
-            )
+            raise RuntimeError(f"Não foi possível extrair JSON da resposta:\n{text}")
 
         return text[start : end + 1]
+
+
+class AIService:
+    def __init__(self) -> None:
+        self._llm = GeminiClient(
+            api_key=settings.google_api_key,
+            model=settings.gemini_model,
+        )
+        self._rag = RAGService()
+
+    def ingest_documents(self, docs: list[tuple[str, str]]) -> None:
+        chunks = [
+            DocumentChunk(content=content, source=source) for content, source in docs
+        ]
+        self._rag.ingest(chunks)
+
+    def answer_with_rag(self, question: str) -> str:
+        retrieved = self._rag.retrieve(question)
+
+        context = "\n\n".join(f"Fonte: {c.source}\n{c.content}" for c in retrieved)
+
+        prompt = f"""
+Use exclusivamente o contexto abaixo para responder à pergunta.
+Contexto:
+{context}
+Pergunta:
+{question}
+"""
+
+        return self._llm.generate(prompt)
