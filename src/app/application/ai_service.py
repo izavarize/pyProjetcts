@@ -1,9 +1,10 @@
 import json
+from datetime import date
 
 from app.application.rag_service import RAGService
 from app.core.config import settings
-from app.domain.rag_response import RAGAnswer
 from app.domain.rag import DocumentChunk
+from app.domain.rag_response import RAGAnswer
 from app.infrastructure.ai.gemini_client import GeminiClient
 
 
@@ -17,7 +18,7 @@ class AIService:
 
     def ingest_documents(self, docs: list[tuple[str, str]]) -> None:
         """
-        Recebe documentos brutos e delega a ingestão ao RAGService.
+        Recebe documentos brutos e delega a ingestão ao RAG.
         """
         chunks = [
             DocumentChunk(content=content, source=source) for content, source in docs
@@ -25,7 +26,14 @@ class AIService:
         self._rag.ingest(chunks)
 
     def answer_with_rag(self, question: str) -> RAGAnswer:
+        """
+        Primeiro tenta responder via RAG.
+        Se não houver contexto relevante, faz fallback para LLM puro.
+        """
         retrieved = self._rag.retrieve(question)
+
+        if not retrieved:
+            return self._fallback_answer(question)
 
         context_blocks = []
         sources = []
@@ -53,6 +61,38 @@ Instruções obrigatórias:
 {{
   "answer": string,
   "sources": string[]
+}}
+"""
+
+        raw = self._llm.generate(prompt)
+        cleaned = self._extract_json(raw)
+        data = json.loads(cleaned)
+
+        return RAGAnswer.model_validate(data)
+
+    def _fallback_answer(self, question: str) -> RAGAnswer:
+        """
+        Fallback para LLM puro quando o RAG não encontra contexto.
+        """
+        today = date.today().strftime("%d/%m/%Y")
+
+        prompt = f"""
+Você é um assistente jurídico e informacional.
+
+A pergunta abaixo NÃO possui base nos documentos fornecidos.
+Responda com base em conhecimento geral, deixando claro que
+a resposta NÃO está fundamentada em documentos específicos.
+
+Data atual: {today}
+
+Pergunta:
+{question}
+
+Retorne a resposta no seguinte JSON:
+
+{{
+  "answer": string,
+  "sources": []
 }}
 """
 
