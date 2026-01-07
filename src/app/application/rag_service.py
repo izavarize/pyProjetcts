@@ -10,7 +10,6 @@ class RAGService:
         self._store = SQLiteVectorStore("rag.db")
         self._chunker = TokenChunker(chunk_tokens=200, overlap_tokens=40)
 
-        # Baseline seguro
         self._min_score = 0.75
 
     def ingest(self, documents: list[DocumentChunk]) -> None:
@@ -37,6 +36,7 @@ class RAGService:
         query_embedding = self._embedder.embed([query])[0]
 
         results = self._store.search(
+            query=query,
             query_vector=query_embedding,
             top_k=top_k,
             min_score=self._min_score,

@@ -5,12 +5,14 @@ from pathlib import Path
 import numpy as np
 
 from app.domain.rag import DocumentChunk, RetrievedChunk
+from app.infrastructure.rag.keyword_scorer import KeywordScorer
 
 
 class SQLiteVectorStore:
     def __init__(self, db_path: str = "rag.db") -> None:
         self._path = Path(db_path)
         self._conn = sqlite3.connect(self._path)
+        self._keyword_scorer = KeywordScorer()
         self._init_db()
 
     def _init_db(self) -> None:
@@ -47,13 +49,11 @@ class SQLiteVectorStore:
 
     def search(
         self,
+        query: str,
         query_vector: list[float],
         top_k: int = 3,
         min_score: float = 0.75,
     ) -> list[RetrievedChunk]:
-        """
-        Retorna apenas chunks com score >= min_score.
-        """
         cur = self._conn.cursor()
         cur.execute("SELECT source, content, embedding FROM vectors")
 
@@ -65,14 +65,18 @@ class SQLiteVectorStore:
         for source, content, emb_json in rows:
             v = np.array(json.loads(emb_json))
 
-            score = float(np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v)))
+            vector_score = float(np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v)))
 
-            if score >= min_score:
+            keyword_score = self._keyword_scorer.score(query, content)
+
+            final_score = (0.7 * vector_score) + (0.3 * keyword_score)
+
+            if final_score >= min_score:
                 results.append(
                     RetrievedChunk(
                         content=content,
                         source=source,
-                        score=score,
+                        score=final_score,
                     )
                 )
 
