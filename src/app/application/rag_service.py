@@ -1,7 +1,7 @@
 from app.domain.rag import DocumentChunk
 from app.infrastructure.rag.token_chunker import TokenChunker
 from app.infrastructure.rag.embedder import GeminiEmbedder
-from app.infrastructure.rag.vector_store import InMemoryVectorStore
+from app.infrastructure.rag.sqlite_vector_store import SQLiteVectorStore
 
 
 class RAGService:
