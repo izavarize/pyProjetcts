@@ -7,27 +7,44 @@ from app.infrastructure.rag.sqlite_vector_store import SQLiteVectorStore
 class RAGService:
     def __init__(self) -> None:
         self._embedder = GeminiEmbedder()
-        self._store = InMemoryVectorStore()
+        self._store = SQLiteVectorStore("rag.db")
         self._chunker = TokenChunker(chunk_tokens=200, overlap_tokens=40)
 
     def ingest(self, documents: list[DocumentChunk]) -> None:
+        """
+        Recebe documentos, aplica chunking por tokens,
+        gera embeddings e persiste no vector store.
+        """
         chunks: list[DocumentChunk] = []
 
         for doc in documents:
             parts = self._chunker.chunk(doc.content)
-            for i, part in enumerate(parts):
+
+            for idx, part in enumerate(parts):
                 chunks.append(
                     DocumentChunk(
                         content=part,
-                        source=f"{doc.source}#chunk{i}",
+                        source=f"{doc.source}#chunk{idx}",
                     )
                 )
+
+        if not chunks:
+            return
 
         embeddings = self._embedder.embed([c.content for c in chunks])
         self._store.add(embeddings, chunks)
 
     def retrieve(self, query: str, top_k: int = 3) -> list[DocumentChunk]:
+        """
+        Busca os chunks mais relevantes para a query.
+        """
         query_embedding = self._embedder.embed([query])[0]
         results = self._store.search(query_embedding, top_k=top_k)
 
-        return [DocumentChunk(r.content, r.source) for r in results]
+        return [
+            DocumentChunk(
+                content=result.content,
+                source=result.source,
+            )
+            for result in results
+        ]
