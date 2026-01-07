@@ -1,5 +1,5 @@
 from app.domain.rag import DocumentChunk
-from app.infrastructure.rag.chunker import TextChunker
+from app.infrastructure.rag.token_chunker import TokenChunker
 from app.infrastructure.rag.embedder import GeminiEmbedder
 from app.infrastructure.rag.vector_store import InMemoryVectorStore
 
@@ -8,7 +8,7 @@ class RAGService:
     def __init__(self) -> None:
         self._embedder = GeminiEmbedder()
         self._store = InMemoryVectorStore()
-        self._chunker = TextChunker(chunk_size=500, overlap=100)
+        self._chunker = TokenChunker(chunk_tokens=200, overlap_tokens=40)
 
     def ingest(self, documents: list[DocumentChunk]) -> None:
         chunks: list[DocumentChunk] = []
