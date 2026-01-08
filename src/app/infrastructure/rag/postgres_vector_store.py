@@ -1,46 +1,48 @@
-from typing import Iterable
+import uuid
+from typing import List
 
-from sqlalchemy import text, create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from app.domain.rag import DocumentChunk, RetrievedChunk
-from app.infrastructure.rag.keyword_scorer import KeywordScorer
+from app.domain.rag import DocumentChunk
 
 
 class PostgresVectorStore:
     def __init__(self, dsn: str) -> None:
         self._engine: Engine = create_engine(dsn)
-        self._keyword = KeywordScorer()
 
-    def add(self, vectors: list[list[float]], chunks: list[DocumentChunk]) -> None:
-        insert_sql = text(
+    def upsert(
+        self,
+        chunks: List[DocumentChunk],
+        embeddings: List[List[float]],
+    ) -> None:
+        sql = text(
             """
-            INSERT INTO vectors (source, content, embedding)
-            VALUES (:source, :content, :embedding)
+            INSERT INTO vectors (id, source, content, embedding)
+            VALUES (:id, :source, :content, :embedding)
             """
         )
 
         with self._engine.begin() as conn:
-            for vector, chunk in zip(vectors, chunks):
+            for chunk, embedding in zip(chunks, embeddings):
                 conn.execute(
-                    insert_sql,
+                    sql,
                     {
+                        "id": str(uuid.uuid4()),
                         "source": chunk.source,
                         "content": chunk.content,
-                        "embedding": vector,
+                        "embedding": embedding,
                     },
                 )
 
     def search(
         self,
-        query: str,
-        query_vector: list[float],
-        top_k: int = 10,
-        min_score: float = 0.75,
-    ) -> list[RetrievedChunk]:
+        query_embedding: List[float],
+        limit: int,
+        min_score: float,
+    ) -> List[DocumentChunk]:
         """
-        Busca vetorial feita no SQL usando <=> (cosine distance).
-        Re-rank híbrido (vetor + keyword) no Python.
+        Busca vetorial por similaridade de cosseno (pgvector).
         """
 
         sql = text(
@@ -48,38 +50,28 @@ class PostgresVectorStore:
             SELECT
                 source,
                 content,
-                1 - (embedding <=> :query_vec) AS vector_score
+                1 - (embedding <=> (:query_vec)::vector) AS score
             FROM vectors
-            ORDER BY embedding <=> :query_vec
+            WHERE 1 - (embedding <=> (:query_vec)::vector) >= :min_score
+            ORDER BY embedding <=> (:query_vec)::vector
             LIMIT :limit
             """
         )
 
-        with self._engine.connect() as conn:
+        with self._engine.begin() as conn:
             rows = conn.execute(
                 sql,
                 {
-                    "query_vec": query_vector,
-                    "limit": top_k * 2,  # margem para re-rank
+                    "query_vec": query_embedding,
+                    "limit": limit,
+                    "min_score": min_score,
                 },
             ).fetchall()
 
-        results: list[RetrievedChunk] = []
-
-        for row in rows:
-            vector_score = float(row.vector_score)
-            keyword_score = self._keyword.score(query, row.content)
-
-            final_score = (0.7 * vector_score) + (0.3 * keyword_score)
-
-            if final_score >= min_score:
-                results.append(
-                    RetrievedChunk(
-                        content=row.content,
-                        source=row.source,
-                        score=final_score,
-                    )
-                )
-
-        results.sort(key=lambda x: x.score, reverse=True)
-        return results[:top_k]
+        return [
+            DocumentChunk(
+                content=row.content,
+                source=row.source,
+            )
+            for row in rows
+        ]

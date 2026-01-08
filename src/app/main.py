@@ -4,27 +4,28 @@ from app.application.ai_service import AIService
 def main() -> None:
     ai = AIService()
 
-    ai.ingest_documents(
-        [
-            (
-                "A função soma recebe dois parâmetros e retorna a soma.",
-                "manual-python.txt",
-            ),
-            (
-                "Em Python, funções são definidas com a palavra-chave def.",
-                "doc-python.txt",
-            ),
-        ]
-    )
+    perguntas = [
+        "o que diz o art. 3º da constituição brasileira?",
+        "quais são os objetivos fundamentais da república?",
+        "o que significa erradicar a pobreza no contexto constitucional?",
+    ]
 
-    result = ai.answer_with_rag("o que diz o art. 3º da constituição brasileira?")
+    for pergunta in perguntas:
+        result = ai.answer_with_rag(pergunta)
 
-    print("Resposta:")
-    print(result.answer)
+        print("\nPergunta:")
+        print(pergunta)
 
-    print("\nFontes:")
-    for src in result.sources:
-        print(f"- {src}")
+        print("\nResposta:")
+        print(result.answer)
+
+        if result.sources:
+            print("\nFontes:")
+            for src in result.sources:
+                print(f"- {src}")
+        else:
+            print("\nFontes:")
+            print("Resposta baseada em conhecimento geral.")
 
 
 if __name__ == "__main__":

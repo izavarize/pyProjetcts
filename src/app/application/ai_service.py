@@ -1,100 +1,60 @@
-import json
-from datetime import date
-
-from app.application.rag_service import RAGService
 from app.core.config import settings
-from app.domain.rag import DocumentChunk
-from app.domain.rag_response import RAGAnswer
+from app.domain.answer import AnswerResult
+from app.application.rag_service import RAGService
 from app.infrastructure.ai.gemini_client import GeminiClient
+from app.infrastructure.ai.llm_client import LLMClient
 
 
 class AIService:
     def __init__(self) -> None:
-        self._llm = GeminiClient(
-            api_key=settings.google_api_key,
-            model=settings.gemini_model,
-        )
         self._rag = RAGService()
 
-    def ingest_documents(self, docs: list[tuple[str, str]]) -> None:
-        chunks = [
-            DocumentChunk(content=content, source=source)
-            for content, source in docs
-        ]
-        self._rag.ingest(chunks)
+        # 🔑 Aqui está a correção
+        self._llm: LLMClient = GeminiClient(
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_model,
+        )
 
-    def answer_with_rag(self, question: str) -> RAGAnswer:
+    def answer_with_rag(self, question: str) -> AnswerResult:
         retrieved = self._rag.retrieve(question)
 
         if not retrieved:
             return self._fallback_answer(question)
 
-        context_blocks = []
-        sources = []
-
-        for chunk in retrieved:
-            context_blocks.append(
-                f"[Fonte: {chunk.source}]\n{chunk.content}"
-            )
-            sources.append(chunk.source)
-
-        context = "\n\n".join(context_blocks)
-
-        prompt = f"""
-Responda à pergunta utilizando EXCLUSIVAMENTE as informações do contexto abaixo.
-
-Contexto:
-{context}
-
-Pergunta:
-{question}
-
-Retorne a resposta no seguinte JSON:
-{{"answer": string, "sources": string[]}}
-"""
-
-        raw = self._llm.generate(prompt)
-        cleaned = self._extract_json(raw)
-        data = json.loads(cleaned)
-
-        return RAGAnswer.model_validate(data)
-
-    def _fallback_answer(self, question: str) -> RAGAnswer:
-        today = date.today().strftime("%d/%m/%Y")
+        context = "\n\n".join(chunk.content for chunk in retrieved)
 
         prompt = f"""
 Você é um assistente jurídico.
+Use EXCLUSIVAMENTE o contexto abaixo para responder à pergunta.
 
-A pergunta abaixo não possui base documental.
-Responda com conhecimento geral e ressalva explícita.
+CONTEXTO:
+{context}
 
-Data atual: {today}
-
-Pergunta:
+PERGUNTA:
 {question}
 
-Retorne JSON:
-{{"answer": string, "sources": []}}
+Responda em texto claro e objetivo.
 """
 
         raw = self._llm.generate(prompt)
-        cleaned = self._extract_json(raw)
-        data = json.loads(cleaned)
 
-        return RAGAnswer.model_validate(data)
+        return AnswerResult(
+            answer=raw,
+            sources=[c.source for c in retrieved],
+        )
 
-    @staticmethod
-    def _extract_json(text: str) -> str:
-        text = text.strip()
+    def _fallback_answer(self, question: str) -> AnswerResult:
+        prompt = f"""
+Você é um assistente jurídico.
+Responda à pergunta abaixo de forma clara e objetiva.
 
-        if text.startswith("```"):
-            text = text.split("```", 1)[1]
-            text = text.rsplit("```", 1)[0]
+PERGUNTA:
+{question}
+"""
 
-        start = text.find("{")
-        end = text.rfind("}")
+        raw = self._llm.generate(prompt)
 
-        if start == -1 or end == -1:
-            raise RuntimeError("JSON não encontrado")
-
-        return text[start : end + 1]
+        return AnswerResult(
+            answer=raw,
+            sources=[],
+        )

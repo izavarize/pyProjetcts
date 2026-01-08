@@ -1,16 +1,22 @@
-from google import genai
+from typing import List
 
-from app.core.config import settings
+from sentence_transformers import SentenceTransformer
 
 
-class GeminiEmbedder:
+class LocalEmbedder:
+    """
+    Gera embeddings localmente (sem custo / sem quota).
+    """
+
     def __init__(self) -> None:
-        self._client = genai.Client(api_key=settings.google_api_key)
+        # Modelo leve, rápido e excelente para RAG
+        self._model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        response = self._client.models.embed_content(
-            model="text-embedding-004",
-            contents=texts,
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        embeddings = self._model.encode(
+            texts,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
         )
 
-        return [e.values for e in response.embeddings]
+        return embeddings.tolist()
