@@ -1,9 +1,60 @@
 {
-  "python.defaultInterpreterPath": ".venv\\Scripts\\python.exe",
+  // ===============================
+  // Python / Virtual Environment
+  // ===============================
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.envFile": "${workspaceFolder}/.env",
+
+  // ===============================
+  // Execução e análise
+  // ===============================
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.useLibraryCodeForTypes": true,
+  "python.analysis.typeCheckingMode": "basic",
+
+  // ===============================
+  // Formatação (Ruff)
+  // ===============================
+  "python.formatting.provider": "none",
   "editor.formatOnSave": true,
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter",
-    "editor.formatOnSave": true
+  "editor.defaultFormatter": "charliermarsh.ruff",
+
+  // ===============================
+  // Lint (Ruff)
+  // ===============================
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+
+  // ===============================
+  // Testes (pytest)
+  // ===============================
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+
+  // ===============================
+  // Terminal integrado
+  // ===============================
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}/src"
   },
-  "python.testing.pytestEnabled": true
+
+  // ===============================
+  // Organização do Explorer
+  // ===============================
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true
+  },
+
+  // ===============================
+  // Segurança
+  // ===============================
+  "python.analysis.exclude": [
+    "**/.venv/**"
+  ]
 }

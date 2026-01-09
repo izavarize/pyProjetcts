@@ -1,32 +1,47 @@
 from typing import List
-
-from app.core.config import settings
-from app.domain.rag import DocumentChunk
-from app.infrastructure.rag.embedder import LocalEmbedder
-from app.infrastructure.rag.postgres_vector_store import PostgresVectorStore
+from app.infrastructure.rag.embedder import Embedder
+from app.infrastructure.rag.vector_store import VectorStore
+from app.domain.telemetry import TelemetryEvent
+from datetime import datetime
 
 
 class RAGService:
-    def __init__(self) -> None:
-        self._embedder = LocalEmbedder()
-        self._store = PostgresVectorStore(settings.pg_dsn)
-        self._min_score = settings.min_score
+    def __init__(self, embedder: Embedder, store: VectorStore, min_score: float = 0.75):
+        self._embedder = embedder
+        self._store = store
+        self._min_score = min_score
 
-    def ingest(self, docs: List[tuple[str, str]]) -> None:
-        chunks = [
-            DocumentChunk(content=content, source=source)
-            for content, source in docs
-        ]
-
-        embeddings = self._embedder.embed([c.content for c in chunks])
-
-        self._store.upsert(chunks, embeddings)
-
-    def retrieve(self, query: str) -> List[DocumentChunk]:
+    def retrieve(self, query: str):
         query_embedding = self._embedder.embed([query])[0]
 
-        return self._store.search(
+        results = self._store.search(
             query_embedding=query_embedding,
             limit=10,
             min_score=self._min_score,
         )
+
+        if not results:
+            return [], self._rag_metrics([])
+
+        scores = [r.score for r in results]
+
+        metrics = {
+            "retrieved_chunks": len(results),
+            "max_score": max(scores),
+            "avg_score": sum(scores) / len(scores),
+            "min_score": min(scores),
+            "coverage": len([s for s in scores if s >= self._min_score]) / len(scores),
+            "used_fallback": False,
+        }
+
+        return results, metrics
+
+    def _rag_metrics(self, results):
+        return {
+            "retrieved_chunks": 0,
+            "max_score": None,
+            "avg_score": None,
+            "min_score": None,
+            "coverage": 0.0,
+            "used_fallback": True,
+        }
