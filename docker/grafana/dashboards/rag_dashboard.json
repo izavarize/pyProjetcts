@@ -1,0 +1,147 @@
+{
+  "project": {
+    "name": "taxSearch",
+    "description": "Sistema RAG jurídico para pesquisa normativa e constitucional",
+    "domain": "jurídico-tributário",
+    "language": "pt-BR",
+    "architecture": "RAG (Retrieval-Augmented Generation)",
+    "created_at": "2026-01-08"
+  },
+
+  "rag_pipeline": {
+    "steps": [
+      {
+        "order": 1,
+        "name": "Query Embedding",
+        "description": "Geração do embedding vetorial da pergunta do usuário",
+        "model": "text-embedding-3-large",
+        "vector_dimension": 3072
+      },
+      {
+        "order": 2,
+        "name": "Vector Retrieval",
+        "description": "Busca semântica via pgvector com similaridade coseno",
+        "storage": "PostgreSQL + pgvector",
+        "table": "document_chunks",
+        "similarity_metric": "cosine",
+        "top_k": 8,
+        "min_score": 0.75
+      },
+      {
+        "order": 3,
+        "name": "Context Assembly",
+        "description": "Montagem do contexto jurídico a partir dos trechos recuperados",
+        "max_tokens": 3500
+      },
+      {
+        "order": 4,
+        "name": "Answer Generation",
+        "description": "Geração da resposta final com base no contexto recuperado",
+        "model": "gemini-2.5-flash",
+        "temperature": 0.2
+      }
+    ]
+  },
+
+  "models": {
+    "llm": {
+      "provider": "Google",
+      "model": "gemini-2.5-flash",
+      "usage": "answer_generation"
+    },
+    "embedding": {
+      "provider": "OpenAI",
+      "model": "text-embedding-3-large",
+      "dimension": 3072
+    }
+  },
+
+  "database": {
+    "engine": "PostgreSQL",
+    "extensions": [
+      "pgvector"
+    ],
+    "tables": {
+      "documents": {
+        "purpose": "Metadados dos documentos jurídicos",
+        "key_fields": [
+          "id",
+          "source",
+          "version",
+          "created_at"
+        ]
+      },
+      "document_chunks": {
+        "purpose": "Fragmentos semânticos com embeddings",
+        "key_fields": [
+          "id",
+          "document_id",
+          "content",
+          "embedding",
+          "token_count"
+        ],
+        "indexes": [
+          "ivfflat_embedding_index"
+        ]
+      }
+    }
+  },
+
+  "metrics": {
+    "retrieval": {
+      "average_score": {
+        "description": "Média de similaridade dos chunks retornados",
+        "target": ">= 0.80"
+      },
+      "chunks_per_query": {
+        "description": "Quantidade média de chunks usados por resposta",
+        "target": "5 a 8"
+      }
+    },
+    "generation": {
+      "hallucination_rate": {
+        "description": "Taxa de respostas sem respaldo no contexto",
+        "target": "< 5%"
+      },
+      "citation_coverage": {
+        "description": "Percentual de respostas com referência explícita ao texto legal",
+        "target": ">= 95%"
+      }
+    },
+    "performance": {
+      "p95_latency_ms": {
+        "description": "Tempo de resposta no percentil 95",
+        "target": "< 2000"
+      }
+    }
+  },
+
+  "validation_checks": {
+    "database": [
+      "Existência da tabela documents",
+      "Existência da tabela document_chunks",
+      "Extensão pgvector instalada",
+      "Dimensão do embedding compatível com o modelo"
+    ],
+    "rag": [
+      "Consulta retorna chunks acima do min_score",
+      "Contexto não excede limite de tokens",
+      "Resposta cita a fonte normativa"
+    ]
+  },
+
+  "security": {
+    "data_scope": "Somente textos públicos oficiais",
+    "pii": false,
+    "audit_logs": true
+  },
+
+  "roadmap": {
+    "next_steps": [
+      "Dashboard visual (Grafana/Metabase)",
+      "Avaliação automática de respostas",
+      "Versionamento de embeddings",
+      "Suporte a múltiplas constituições e leis infraconstitucionais"
+    ]
+  }
+}
