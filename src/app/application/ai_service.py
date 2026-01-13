@@ -1,42 +1,40 @@
-from datetime import datetime
+from app.core.config import settings
+from app.infrastructure.ai.gemini_client import GeminiClient
 from app.application.rag_service import RAGService
-from app.domain.telemetry import TelemetryEvent
 
 
 class AIService:
-    def __init__(self, llm, rag: RAGService, telemetry_repo):
-        self._llm = llm
-        self._rag = rag
-        self._telemetry = telemetry_repo
+    def __init__(self) -> None:
+        self._llm = GeminiClient()
+        self._rag = RAGService(min_score=settings.min_score)
 
-    def answer_with_rag(self, question: str):
-        start = datetime.utcnow()
+    def answer_with_rag(self, question: str) -> str:
+        retrieved = self._rag.retrieve(question)
 
-        retrieved, rag_metrics = self._rag.retrieve(question)
+        if retrieved:
+            context = "\n\n".join(
+                f"Fonte: {r.source}\n{r.content}" for r in retrieved
+            )
 
-        if not retrieved:
-            answer = self._llm.generate(question)
-            rag_metrics["used_fallback"] = True
-        else:
-            context = "\n\n".join(r.content for r in retrieved)
-            prompt = f"Contexto:\n{context}\n\nPergunta:\n{question}"
-            answer = self._llm.generate(prompt)
+            prompt = f"""
+            Responda à pergunta com base exclusivamente no contexto abaixo.
 
-        duration_ms = (datetime.utcnow() - start).total_seconds() * 1000
+            CONTEXTO:
+            {context}
 
-        event = TelemetryEvent(
-            timestamp=datetime.utcnow(),
-            operation="answer_with_rag",
-            duration_ms=duration_ms,
-            success=True,
-            retrieved_chunks=rag_metrics["retrieved_chunks"],
-            max_score=rag_metrics["max_score"],
-            avg_score=rag_metrics["avg_score"],
-            min_score=rag_metrics["min_score"],
-            coverage=rag_metrics["coverage"],
-            used_fallback=rag_metrics["used_fallback"],
-        )
+            PERGUNTA:
+            {question}
+            """
 
-        self._telemetry.save(event)
+            return self._llm.generate(prompt)
 
-        return answer
+        # fallback controlado
+        prompt = f"""
+        Responda de forma objetiva. Se não souber, diga explicitamente
+        que a informação não consta na base consultada.
+
+        PERGUNTA:
+        {question}
+        """
+
+        return self._llm.generate(prompt)

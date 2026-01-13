@@ -1,53 +1,32 @@
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    Text,
-    DateTime,
-    ForeignKey,
-    UniqueConstraint,
-)
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Text, String, Index
+from sqlalchemy.orm import declarative_base
 from pgvector.sqlalchemy import Vector
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
-from app.infrastructure.persistence.db import Base
-
-
-class DocumentModel(Base):
-    __tablename__ = "documents"
-
-    id = Column(String, primary_key=True)
-    source = Column(String, nullable=False)
-    doc_type = Column(String, nullable=False)
-    title = Column(String)
-    content_hash = Column(String, nullable=False)
-    version = Column(Integer, nullable=False)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    chunks = relationship(
-        "DocumentChunkModel",
-        back_populates="document",
-        cascade="all, delete-orphan",
-    )
-
-    __table_args__ = (
-        UniqueConstraint("source", "version", name="uq_document_source_version"),
-        UniqueConstraint("content_hash", name="uq_document_hash"),
-    )
+Base = declarative_base()
 
 
-class DocumentChunkModel(Base):
+class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
-    id = Column(String, primary_key=True)
-    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
-
-    content = Column(Text, nullable=False)
+    id = Column(Integer, primary_key=True)
+    document_id = Column(String, nullable=False)
     source = Column(String, nullable=False)
-    token_count = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
 
     embedding = Column(Vector(384), nullable=False)
+    search_vector = Column(TSVECTOR)
 
-    document = relationship("DocumentModel", back_populates="chunks")
+    __table_args__ = (
+        Index(
+            "ix_document_chunks_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_document_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )

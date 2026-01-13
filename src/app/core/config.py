@@ -1,37 +1,24 @@
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
-    # =========================
-    # Ambiente / Log
-    # =========================
-    env: str = "local"
-    log_level: str = "INFO"
+    env: str = Field(default="local")
+    log_level: str = Field(default="INFO")
 
-    # =========================
-    # IA / LLM
-    # =========================
-    gemini_api_key: str
-    gemini_model: str = "gemini-2.5-flash"
+    # LLM
+    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.5-flash")
 
-    # =========================
-    # Vector Store
-    # =========================
-    vector_store: str = "postgres"
-    pg_dsn: str
-
-    # =========================
     # RAG
-    # =========================
-    min_score: float = 0.75
+    min_score: float = Field(default=0.75)
 
-    # 🔑 Pydantic v2 configuration
-    model_config = ConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="allow",  # <<< PERMITE VARIÁVEIS EXTRAS
-    )
+    # Database
+    pg_dsn: str = Field(..., env="PG_DSN")
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()

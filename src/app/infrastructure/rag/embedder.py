@@ -1,22 +1,15 @@
+from abc import ABC, abstractmethod
 from typing import List
 
-from sentence_transformers import SentenceTransformer
 
-
-class LocalEmbedder:
+class Embedder(ABC):
     """
-    Gera embeddings localmente (sem custo / sem quota).
+    Contrato para qualquer mecanismo de embedding.
     """
 
-    def __init__(self) -> None:
-        # Modelo leve, rápido e excelente para RAG
-        self._model = SentenceTransformer("all-MiniLM-L6-v2")
-
+    @abstractmethod
     def embed(self, texts: List[str]) -> List[List[float]]:
-        embeddings = self._model.encode(
-            texts,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-        )
-
-        return embeddings.tolist()
+        """
+        Recebe uma lista de textos e retorna embeddings vetoriais.
+        """
+        raise NotImplementedError
