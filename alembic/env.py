@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+"""
+Alembic environment configuration
+"""
+
+import sys
 import os
+from pathlib import Path
 from logging.config import fileConfig
+from dotenv import load_dotenv
+load_dotenv()
 
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+SRC_DIR = BASE_DIR / "src"
+sys.path.insert(0, str(SRC_DIR))
 
 # =========================
 # Alembic Config
@@ -12,39 +24,41 @@ from alembic import context
 
 config = context.config
 
-# Interpret the config file for Python logging
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
+    fileConfig(config.config_file_name)    
 # =========================
-# Import application settings
+# Import Base and models
 # =========================
 
-from app.core.config import settings  # noqa
-from app.infrastructure.persistence.base import Base  # noqa
+#from app.infrastructure.persistence.base import Base  # noqa
+try:
+    from app.infrastructure.persistence.base import Base
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Não foi possível importar Base. "
+        "Verifique se src/app/infrastructure/persistence/base.py existe "
+        "e se todos os diretórios possuem __init__.py"
+    ) from exc
 
-# Import all models so Alembic can see them
+
 from app.infrastructure.persistence import models  # noqa
-
-# =========================
-# Metadata
-# =========================
 
 target_metadata = Base.metadata
 
-
 # =========================
-# Database URL override
+# Database URL resolution
 # =========================
 
 def get_database_url() -> str:
     """
-    Resolve database URL from environment or settings.
-    Priority:
-    1. DATABASE_URL env var
-    2. settings.database_url
+    Alembic MUST rely only on environment variables.
     """
-    return os.getenv("DATABASE_URL", settings.database_url)
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required for Alembic migrations"
+        )
+    return url
 
 
 config.set_main_option(
@@ -52,13 +66,11 @@ config.set_main_option(
     get_database_url()
 )
 
-
 # =========================
 # Offline migrations
 # =========================
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
 
     context.configure(
@@ -73,13 +85,11 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-
 # =========================
 # Online migrations
 # =========================
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
@@ -97,7 +107,6 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
-
 
 # =========================
 # Entrypoint
