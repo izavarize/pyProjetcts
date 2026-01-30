@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     # RAG
     min_score: float = Field(default=0.75)
+    # Híbrido: peso vetor (alpha) + peso full-text (beta); alpha + beta = 1
+    rag_hybrid_alpha: float = Field(default=0.7, description="Peso da busca vetorial")
+    rag_hybrid_beta: float = Field(default=0.3, description="Peso da busca full-text")
 
     # Database
     pg_dsn: str = Field(..., env="PG_DSN")
